@@ -1,0 +1,62 @@
+version: "3.8"
+
+volumes:
+  db:
+  nextcloud:
+    external: true
+  npm_data:
+  npm_letsencrypt:
+
+services:
+  db:
+    image: mariadb:11.6
+    restart: always
+    command: --transaction-isolation=READ-COMMITTED --log-bin=binlog --binlog-format=ROW
+    environment:
+      - MYSQL_ROOT_PASSWORD=admin
+      - MYSQL_PASSWORD=admin
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+    volumes:
+      - db:/var/lib/mysql
+      - ./my.cnf:/etc/mysql/conf.d/my.cnf
+    networks:
+      - proxy_net
+
+  app:
+    image: nextcloud
+    restart: always
+    depends_on:
+      - db
+    environment:
+      - MYSQL_PASSWORD=admin
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - MYSQL_HOST=db
+      - NEXTCLOUD_TRUSTED_DOMAINS=jragcloud.duckdns.org
+    volumes:
+      - nextcloud:/var/www/html
+      - D:/nextcloud/data:/var/www/html/data
+    expose:
+      - "80"
+    networks:
+      - proxy_net
+
+  nginx-proxy-manager:
+    image: jc21/nginx-proxy-manager:latest
+    restart: always
+    ports:
+      - "80:80"
+      - "81:81"   # web UI
+      - "443:443"
+    environment:
+      - TZ=Europe/London
+    volumes:
+      - npm_data:/data
+      - npm_letsencrypt:/etc/letsencrypt
+    networks:
+      - proxy_net
+
+networks:
+  proxy_net:
+    driver: bridge
